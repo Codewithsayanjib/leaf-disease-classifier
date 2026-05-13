@@ -3,17 +3,14 @@ import os
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 from PIL import Image
 from torchvision import transforms
 from pytorch_grad_cam import GradCAM
-from pytorch_grad_cam.utils.image import show_cam_on_image
 import config
 
 def get_gradcam(model, img_path: str, class_names: list):
-    """Generate GradCAM heatmap for a single image."""
     model.eval()
-
-    # Target layer (last conv block of EfficientNetV2-S)
     target_layer = [model.conv_head]
 
     preprocess = transforms.Compose([
@@ -30,27 +27,31 @@ def get_gradcam(model, img_path: str, class_names: list):
     cam = GradCAM(model=model, target_layers=target_layer)
     grayscale_cam = cam(input_tensor=input_tensor)[0]
 
-    rgb_img = np.array(raw_img) / 255.0
-    visualization = show_cam_on_image(rgb_img.astype(np.float32),
-                                      grayscale_cam, use_rgb=True)
+    # Overlay heatmap using matplotlib only (no cv2)
+    rgb_img = np.array(raw_img).astype(np.float32) / 255.0
+    heatmap = cm.jet(grayscale_cam)[:, :, :3]  # RGBA -> RGB
+    overlay = 0.5 * rgb_img + 0.5 * heatmap
+    overlay = np.clip(overlay, 0, 1)
 
     # Prediction
     with torch.no_grad():
         out = model(input_tensor)
         prob = torch.softmax(out, dim=1)
-        top5 = torch.topk(prob, 5)
+        top1_idx = prob.argmax(1).item()
+        top1_conf = prob[0][top1_idx].item()
+
+    pred_class = class_names[top1_idx]
+    pred_conf  = top1_conf
 
     # Plot
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     axes[0].imshow(raw_img); axes[0].set_title("Original"); axes[0].axis("off")
-    axes[1].imshow(visualization); axes[1].set_title("GradCAM"); axes[1].axis("off")
-
-    pred_class = class_names[top5.indices[0][0].item()]
-    pred_conf  = top5.values[0][0].item()
+    axes[1].imshow(overlay); axes[1].set_title("GradCAM");  axes[1].axis("off")
     fig.suptitle(f"Predicted: {pred_class} ({pred_conf:.2%})", fontsize=13, fontweight="bold")
 
     os.makedirs(config.PLOTS_DIR, exist_ok=True)
     out_path = f"{config.PLOTS_DIR}/gradcam_{os.path.basename(img_path)}"
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close()
     print(f"GradCAM saved → {out_path}")
     return pred_class, pred_conf

@@ -12,4 +12,3 @@ Pillow
 streamlit
 albumentations
 huggingface_hub
-opencv-python-headless
