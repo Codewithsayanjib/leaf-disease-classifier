@@ -22,7 +22,7 @@
 
 | Uploaded Leaf | GradCAM Heatmap | Prediction |
 |:---:|:---:|:---:|
-| ![leaf](https://placehold.co/200x200/2d6a4f/white?text=Leaf+Image) | ![cam](https://placehold.co/200x200/d62828/white?text=GradCAM) | `Tomato Early Blight` · `90.67%` |
+| ![leaf](assets/demo_leaf.png) | ![cam](assets/demo_gradcam.png) | `Tomato Early Blight` · `93.15%` |
 
 > 🔥 **GradCAM** highlights exactly *which regions* of the leaf the model focuses on — making predictions transparent and trustworthy.
 
