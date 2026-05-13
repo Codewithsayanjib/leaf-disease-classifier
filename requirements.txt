@@ -1,0 +1,15 @@
+torch
+torchvision
+torchaudio
+timm
+grad-cam
+matplotlib
+seaborn
+scikit-learn
+tqdm
+pandas
+Pillow
+streamlit
+albumentations
+huggingface_hub
+opencv-python-headless
