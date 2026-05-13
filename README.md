@@ -215,7 +215,7 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 [![GitHub](https://img.shields.io/badge/GitHub-Codewithsayanjib-181717?style=for-the-badge&logo=github)](https://github.com/Codewithsayanjib)
 
-*Built as part of a Computer Vision assignment — designed to be production-ready.*
+*Built as part of a Data Science assignment*
 
 </div>
 
