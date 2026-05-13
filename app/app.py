@@ -7,10 +7,30 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from PIL import Image
-from torchvision import transforms
-from src.model    import load_model
+from huggingface_hub import hf_hub_download
+from src.model import load_model
 from src.gradcam_viz import get_gradcam
 import config, tempfile
+
+# Auto-download model from Hugging Face if not present
+os.makedirs("outputs/checkpoints", exist_ok=True)
+os.makedirs("models", exist_ok=True)
+
+if not os.path.exists("outputs/checkpoints/best_model.pth"):
+    with st.spinner("Downloading model weights..."):
+        hf_hub_download(
+            repo_id="Sayanjib/leaf-disease-classifier",
+            filename="best_model.pth",
+            local_dir="outputs/checkpoints"
+        )
+
+if not os.path.exists("models/class_names.json"):
+    with st.spinner("Downloading class names..."):
+        hf_hub_download(
+            repo_id="Sayanjib/leaf-disease-classifier",
+            filename="class_names.json",
+            local_dir="models"
+        )
 
 st.set_page_config(page_title="🌿 Leaf Disease Classifier", layout="wide")
 st.title("🌿 Leaf Disease Classifier")
@@ -33,7 +53,6 @@ if uploaded:
     with col1:
         st.image(uploaded, caption="Uploaded Image", use_container_width=True)
 
-    # Save to temp file for GradCAM
     with tempfile.NamedTemporaryFile(suffix=".jpg", delete=False) as tmp:
         tmp.write(uploaded.read())
         tmp_path = tmp.name
@@ -43,6 +62,6 @@ if uploaded:
 
     with col2:
         st.image(f"{config.PLOTS_DIR}/gradcam_{os.path.basename(tmp_path)}",
-         caption="GradCAM Heatmap", use_container_width=True)
+                 caption="GradCAM Heatmap", use_container_width=True)
 
     st.success(f"**Predicted:** `{pred_class}`  |  **Confidence:** `{pred_conf:.2%}`")
