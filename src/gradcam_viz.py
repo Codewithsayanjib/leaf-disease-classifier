@@ -6,12 +6,40 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from PIL import Image
 from torchvision import transforms
-from pytorch_grad_cam import GradCAM
 import config
+
+class GradCAM:
+    def __init__(self, model, target_layer):
+        self.model = model
+        self.gradients = None
+        self.activations = None
+        target_layer.register_forward_hook(self._save_activation)
+        target_layer.register_full_backward_hook(self._save_gradient)
+
+    def _save_activation(self, module, input, output):
+        self.activations = output.detach()
+
+    def _save_gradient(self, module, grad_input, grad_output):
+        self.gradients = grad_output[0].detach()
+
+    def __call__(self, input_tensor, class_idx=None):
+        output = self.model(input_tensor)
+        if class_idx is None:
+            class_idx = output.argmax(dim=1).item()
+        self.model.zero_grad()
+        output[0, class_idx].backward()
+        weights = self.gradients.mean(dim=(2, 3), keepdim=True)
+        cam = (weights * self.activations).sum(dim=1, keepdim=True)
+        cam = torch.relu(cam)
+        cam = cam.squeeze().cpu().numpy()
+        cam -= cam.min()
+        if cam.max() != 0:
+            cam /= cam.max()
+        return cam, class_idx, torch.softmax(output, dim=1)[0, class_idx].item()
+
 
 def get_gradcam(model, img_path: str, class_names: list):
     model.eval()
-    target_layer = [model.conv_head]
 
     preprocess = transforms.Compose([
         transforms.Resize((config.IMG_SIZE, config.IMG_SIZE)),
@@ -20,38 +48,32 @@ def get_gradcam(model, img_path: str, class_names: list):
                              [0.229, 0.224, 0.225]),
     ])
 
-    raw_img = Image.open(img_path).convert("RGB")
-    raw_img = raw_img.resize((config.IMG_SIZE, config.IMG_SIZE))
+    raw_img = Image.open(img_path).convert("RGB").resize((config.IMG_SIZE, config.IMG_SIZE))
     input_tensor = preprocess(raw_img).unsqueeze(0).to(config.DEVICE)
 
-    cam = GradCAM(model=model, target_layers=target_layer)
-    grayscale_cam = cam(input_tensor=input_tensor)[0]
+    gradcam = GradCAM(model, model.conv_head)
+    cam, class_idx, confidence = gradcam(input_tensor)
 
-    # Overlay heatmap using matplotlib only (no cv2)
+    # Resize cam to image size
+    cam_img = Image.fromarray((cam * 255).astype(np.uint8)).resize(
+        (config.IMG_SIZE, config.IMG_SIZE), Image.BILINEAR
+    )
+    cam_np = np.array(cam_img) / 255.0
+
+    # Overlay using matplotlib only
     rgb_img = np.array(raw_img).astype(np.float32) / 255.0
-    heatmap = cm.jet(grayscale_cam)[:, :, :3]  # RGBA -> RGB
-    overlay = 0.5 * rgb_img + 0.5 * heatmap
-    overlay = np.clip(overlay, 0, 1)
+    heatmap = cm.jet(cam_np)[:, :, :3]
+    overlay = np.clip(0.5 * rgb_img + 0.5 * heatmap, 0, 1)
 
-    # Prediction
-    with torch.no_grad():
-        out = model(input_tensor)
-        prob = torch.softmax(out, dim=1)
-        top1_idx = prob.argmax(1).item()
-        top1_conf = prob[0][top1_idx].item()
+    pred_class = class_names[class_idx]
 
-    pred_class = class_names[top1_idx]
-    pred_conf  = top1_conf
-
-    # Plot
     fig, axes = plt.subplots(1, 2, figsize=(10, 4))
     axes[0].imshow(raw_img); axes[0].set_title("Original"); axes[0].axis("off")
     axes[1].imshow(overlay); axes[1].set_title("GradCAM");  axes[1].axis("off")
-    fig.suptitle(f"Predicted: {pred_class} ({pred_conf:.2%})", fontsize=13, fontweight="bold")
+    fig.suptitle(f"Predicted: {pred_class} ({confidence:.2%})", fontsize=13, fontweight="bold")
 
     os.makedirs(config.PLOTS_DIR, exist_ok=True)
     out_path = f"{config.PLOTS_DIR}/gradcam_{os.path.basename(img_path)}"
     plt.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close()
-    print(f"GradCAM saved → {out_path}")
-    return pred_class, pred_conf
+    return pred_class, confidence
