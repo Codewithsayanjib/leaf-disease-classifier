@@ -1,4 +1,3 @@
-# src/gradcam_viz.py
 import os
 import torch
 import numpy as np
@@ -54,13 +53,11 @@ def get_gradcam(model, img_path: str, class_names: list):
     gradcam = GradCAM(model, model.conv_head)
     cam, class_idx, confidence = gradcam(input_tensor)
 
-    # Resize cam to image size
     cam_img = Image.fromarray((cam * 255).astype(np.uint8)).resize(
         (config.IMG_SIZE, config.IMG_SIZE), Image.BILINEAR
     )
     cam_np = np.array(cam_img) / 255.0
 
-    # Overlay using matplotlib only
     rgb_img = np.array(raw_img).astype(np.float32) / 255.0
     heatmap = cm.jet(cam_np)[:, :, :3]
     overlay = np.clip(0.5 * rgb_img + 0.5 * heatmap, 0, 1)

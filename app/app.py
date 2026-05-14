@@ -1,4 +1,3 @@
-# app/app.py
 import streamlit as st
 import torch
 import json
@@ -12,7 +11,6 @@ from src.model import load_model
 from src.gradcam_viz import get_gradcam
 import config, tempfile
 
-# Auto-download model from Hugging Face if not present
 os.makedirs("outputs/checkpoints", exist_ok=True)
 os.makedirs("models", exist_ok=True)
 

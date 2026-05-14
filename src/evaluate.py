@@ -1,4 +1,3 @@
-# src/evaluate.py
 import os
 import torch
 import numpy as np
@@ -23,7 +22,6 @@ def full_evaluate(model, test_loader, class_names):
     print("\n📊 Classification Report:")
     print(classification_report(all_labels, all_preds, target_names=class_names))
 
-    # Confusion matrix
     cm = confusion_matrix(all_labels, all_preds)
     fig, ax = plt.subplots(figsize=(20, 18))
     sns.heatmap(cm, annot=True, fmt="d", xticklabels=class_names,
